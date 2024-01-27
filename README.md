@@ -15,6 +15,8 @@ examples include but are not limited to:
 - simple js fetch with a form as input
 - redirect response
 
+reload flag is set with uvicorn so the app will be reloaded every time a .py file is saved
+
 let me know if there's something you'd like to see added
 
 ## Directions
