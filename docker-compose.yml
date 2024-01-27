@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  home:
+      build: 
+        context: ./app
+        dockerfile: Dockerfile
+      command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      # restart: unless-stopped
+      environment: 
+        PYTHONUNBUFFERED: 1  # this allows fastapi to print to the terminal
+        PYTHONDONTWRITEBYTECODE: 1  # this has python not write __pycache__ files
+        ENV_1: ${ENV_1}
+        ENV_2: ${ENV_2}
+      ports:
+        - 8000:8000
+      volumes:
+        - ./app:/app
+  
