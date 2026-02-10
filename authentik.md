@@ -792,33 +792,89 @@ export default api;
 
 ### Phase 4: Security Best Practices
 
-#### 5.1 Token Security
+#### 4.1 Token Security
 - ✅ Use `httponly` cookies to prevent XSS attacks
 - ✅ Use `secure` flag (HTTPS only)
 - ✅ Use `samesite=lax` to prevent CSRF
 - ✅ Short-lived access tokens (10 minutes)
 - ✅ Rotate refresh tokens on use (if Authentik supports)
 
-#### 5.2 HTTPS Requirements
+#### 4.2 HTTPS Requirements
 - ✅ **Mandatory**: All apps must use HTTPS in production
 - ✅ Use Let's Encrypt or similar for SSL certificates
 - ✅ Configure reverse proxy (nginx/traefik) for TLS termination
 
-#### 5.3 CORS Configuration
-If using separate frontend:
+#### 4.3 CORS Configuration
+
+**What is CORS?**
+Cross-Origin Resource Sharing (CORS) is a security mechanism that controls which websites can make API requests to your FastAPI backend from the browser. Without CORS, browsers block requests from your frontend (e.g., `localhost:9902`) to your API (e.g., `localhost:8000`) because they're on different "origins" (different ports/domains).
+
+**Your Architecture**:
+- **Backend API**: `localhost:8000` (dev) / `https://evezor.com` (prod)
+- **Frontend**: `localhost:9902` (dev) / `https://evezor.com` (prod)
+- **Note**: Each app has its own backend, so this API only serves its own frontend
+
+**Configuration**:
+
+Add CORS middleware to `app/main.py`:
+
 ```python
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
+
+app = FastAPI()
+
+# CORS Configuration
+# Development origins (localhost with specific ports)
+dev_origins = [
+    "http://localhost:9902",  # evezor.com frontend dev server
+    "http://localhost:8000",  # Backend itself (for testing)
+]
+
+# Production origins (actual domains)
+prod_origins = [
+    "https://evezor.com",  # Main evezor site
+]
+
+# Determine which origins to use based on environment
+ENV = os.getenv("ENVIRONMENT", "development")
+allowed_origins = prod_origins if ENV == "production" else dev_origins + prod_origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://home.evezor.com", "https://floe.evezor.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,  # Only allow requests from your frontend
+    allow_credentials=True,  # Required: Allows cookies/auth headers (JWT tokens)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Allowed HTTP methods
+    allow_headers=["*"],  # Allow all headers (can be more restrictive if needed)
 )
 ```
 
-#### 5.4 Additional Security Measures
+**Important Notes**:
+- ✅ **`allow_credentials=True`** is REQUIRED because your frontend needs to send JWT cookies
+- ✅ **Specific origins only** - Never use `["*"]` with credentials (security risk)
+- ✅ **Environment-aware** - Different origins for dev vs production
+- ⚠️ **floe.evezor.com is NOT included** - It has its own backend (per your architecture)
+- ⚠️ **localhost:8000 is temporary** - Will be removed once you discard this debug repo
+
+**Add to `.env`**:
+```env
+ENVIRONMENT=development  # Change to "production" in prod deployment
+```
+
+**Testing CORS**:
+1. Start backend: `docker-compose up -d home` (runs on `localhost:8000`)
+2. Start frontend dev server on `localhost:9902`
+3. Make an API call from frontend JavaScript:
+   ```javascript
+   fetch('http://localhost:8000/api/endpoint', {
+     method: 'GET',
+     credentials: 'include'  // Important: sends cookies
+   })
+   ```
+4. Check browser console - should work without CORS errors
+
+#### 4.4 Additional Security Measures
 - ✅ Rate limiting on auth endpoints
 - ✅ Monitor failed login attempts
 - ✅ Implement PKCE for additional security (optional for confidential clients)
@@ -829,7 +885,7 @@ app.add_middleware(
 
 ### Phase 5: Testing Strategy
 
-#### 6.1 Local Development Setup
+#### 5.1 Local Development Setup
 1. **Start the container**:
    ```bash
    docker-compose up -d home
@@ -857,7 +913,7 @@ app.add_middleware(
    docker-compose up -d home
    ```
 
-#### 6.2 Test Cases
+#### 5.2 Test Cases
 - ✅ Login flow (happy path)
 - ✅ Login with invalid credentials
 - ✅ Token expiration and refresh
@@ -867,7 +923,7 @@ app.add_middleware(
 - ✅ Cross-app SSO flow
 - ✅ Logout flow
 
-#### 6.3 Integration Tests
+#### 5.3 Integration Tests
 
 Add `pytest` to `app/requirements.txt`:
 ```
@@ -928,7 +984,7 @@ docker-compose run --rm test
 
 ### Phase 6: Deployment Checklist
 
-#### 7.1 Authentik Configuration
+#### 6.1 Authentik Configuration
 - [ ] OAuth provider created and configured
 - [ ] Application registered in Authentik
 - [ ] Groups and roles configured
@@ -936,7 +992,7 @@ docker-compose run --rm test
 - [ ] Token lifetimes configured appropriately
 - [ ] JWKS endpoint accessible
 
-#### 7.2 FastAPI Application (Container)
+#### 6.2 FastAPI Application (Container)
 - [ ] All dependencies added to `app/requirements.txt`
 - [ ] Docker image builds successfully (`docker-compose build home`)
 - [ ] Environment variables set in `.env`
@@ -946,7 +1002,7 @@ docker-compose run --rm test
 - [ ] Error handling in place
 - [ ] Container health checks configured (optional)
 
-#### 7.2a Production Docker Compose
+#### 6.2a Production Docker Compose
 
 For production, update `docker-compose.yml`:
 ```yaml
@@ -974,13 +1030,13 @@ services:
 
 **Note**: Remove `--reload` and volumes in production for better performance and security.
 
-#### 7.3 Frontend
+#### 6.3 Frontend
 - [ ] Login/logout UI implemented
 - [ ] Token refresh logic in API client
 - [ ] Protected routes redirect to login
 - [ ] User info displayed when authenticated
 
-#### 7.4 Infrastructure (Containerized Deployment)
+#### 6.4 Infrastructure (Containerized Deployment)
 - [ ] HTTPS enabled on all domains
 - [ ] DNS records configured correctly
 - [ ] Reverse proxy configured (nginx/traefik) in front of container
@@ -1027,7 +1083,7 @@ networks:
     external: true
 ```
 
-#### 7.5 floe.evezor.com (Separate Container)
+#### 6.5 floe.evezor.com (Separate Container)
 - [ ] Same auth dependencies added to its `requirements.txt`
 - [ ] JWKS validation implemented
 - [ ] Redirect URI added to Authentik provider

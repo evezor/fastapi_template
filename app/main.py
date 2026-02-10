@@ -3,20 +3,46 @@ from fastapi import Depends, FastAPI, Request, Form, status, Header, Cookie, HTT
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
 import secrets
 
-
 # Secure cookie can be turned off for local development (not recommended for production)
-SECURE_COOKIES = False
+SECURE_COOKIES = os.getenv("SECURE_COOKIES") == "true"
 
 # Import authentication modules
 from auth import AuthentikSettings, AuthentikOAuth, get_current_user_from_cookie, TokenData, verify_token
 
 app = FastAPI()
+
+# ===== CORS Configuration (Phase 4.3) =====
+# Development origins (localhost with specific ports)
+dev_origins = [
+    "http://localhost:9902",  # evezor.com frontend dev server
+    "http://localhost:9901",  # floe.evezor dev site
+]
+
+# Production origins (actual domains)
+prod_origins = [
+    "https://evezor.com",  # Main evezor site
+    "https://floe.evezor.com",  # Main floe.evezor site
+]
+
+# Determine which origins to use based on environment
+ENV = os.getenv("ENVIRONMENT", "development")
+allowed_origins = prod_origins if ENV == "production" else dev_origins + prod_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,  # Only allow requests from your frontend
+    allow_credentials=True,  # Required: Allows cookies/auth headers (JWT tokens)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Allowed HTTP methods
+    allow_headers=["*"],  # Allow all headers (can be more restrictive if needed)
+)
+
 templates = Jinja2Templates(directory='htmldirectory')
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
@@ -61,12 +87,12 @@ async def auth_callback(
     token_response = await oauth_client.exchange_code_for_token(code)
 
     # DEBUG: Log what we received from Authentik
-    print(f"DEBUG: Token response from Authentik:")
-    print(f"  - access_token: {token_response.access_token[:50]}...")
-    print(f"  - refresh_token: {token_response.refresh_token[:50] if token_response.refresh_token else 'None'}")
-    print(f"  - token_type: {token_response.token_type}")
-    print(f"  - expires_in: {token_response.expires_in}")
-    print(f"  - scope: {token_response.scope}")
+    # print(f"DEBUG: Token response from Authentik:")
+    # print(f"  - access_token: {token_response.access_token[:50]}...")
+    # print(f"  - refresh_token: {token_response.refresh_token[:50] if token_response.refresh_token else 'None'}")
+    # print(f"  - token_type: {token_response.token_type}")
+    # print(f"  - expires_in: {token_response.expires_in}")
+    # print(f"  - scope: {token_response.scope}")
 
     # Get user info
     user_info = await oauth_client.get_userinfo(token_response.access_token)
