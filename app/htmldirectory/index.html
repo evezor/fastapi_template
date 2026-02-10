@@ -1,18 +1,69 @@
-<!DOCTYPE HTML>
+{% extends "base.html" %}
 
+{% block title %}Home{% endblock %}
 
-<html>
-	<head>
-		<title>Example</title>
-		<link rel="icon" href="/static/favicon.ico">
-		<link rel="stylesheet" href="/static/style.css" />
-	</head>
-	<body>
-		<h1>Fasapi Example</h1>
-    <h2>produced by Evezor</h2>
-		
-		<img src="/static/logo.png" alt="evezor logo">
-		
-    
-	</body>
-</html>
+{% block content %}
+<div style="text-align: center; padding: 2rem 0;">
+    <h1>FastAPI Example</h1>
+    <h2>Produced by Evezor</h2>
+
+    <div style="margin: 2rem 0;">
+        <img src="/static/logo.png" alt="Evezor Logo" style="max-width: 400px; height: auto;">
+    </div>
+
+    <!-- Authentication Status Card -->
+    <div id="authCard" style="margin: 2rem auto; max-width: 600px;">
+        <!-- Will be populated by JavaScript -->
+    </div>
+
+    <!-- Quick Links -->
+    <div style="margin-top: 3rem;">
+        <h3>Quick Links</h3>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;">
+            <a href="/dashboard" class="btn btn-primary">Dashboard (Protected)</a>
+            <a href="/api/me" class="btn btn-primary" target="_blank">View My Profile (API)</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Show personalized content based on auth status
+    async function updateAuthCard() {
+        const authCard = document.getElementById('authCard');
+
+        try {
+            const response = await fetch('/api/auth/status', {
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+
+                if (data.authenticated) {
+                    authCard.innerHTML = `
+                        <div class="alert alert-success">
+                            <h3>✓ You are logged in</h3>
+                            <p><strong>Email:</strong> ${data.user.email}</p>
+                            <p><strong>Username:</strong> ${data.user.username}</p>
+                            <p><strong>Groups:</strong> ${data.user.groups.join(', ') || 'None'}</p>
+                        </div>
+                    `;
+                } else {
+                    authCard.innerHTML = `
+                        <div class="alert alert-info">
+                            <h3>Welcome!</h3>
+                            <p>You are not logged in. Click the "Login" button above to authenticate with Authentik.</p>
+                        </div>
+                    `;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load auth card:', error);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', updateAuthCard);
+</script>
+{% endblock %}

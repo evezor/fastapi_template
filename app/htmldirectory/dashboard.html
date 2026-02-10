@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+    <h1>🔒 Protected Dashboard</h1>
+    <p style="color: #7f8c8d; margin-bottom: 2rem;">This page is only accessible to authenticated users.</p>
+
+    <!-- User Information Card -->
+    <div class="alert alert-success" style="margin-bottom: 2rem;">
+        <h3>✓ Authentication Successful</h3>
+        <p>You have successfully authenticated with Authentik and can access protected resources.</p>
+    </div>
+
+    <!-- User Profile Section -->
+    <div style="background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+        <h2>Your Profile</h2>
+        <table style="width: 100%; margin-top: 1rem;">
+            <tr style="border-bottom: 1px solid #ecf0f1;">
+                <td style="padding: 0.75rem; font-weight: bold; width: 200px;">User ID:</td>
+                <td style="padding: 0.75rem;"><code>{{ user.sub }}</code></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #ecf0f1;">
+                <td style="padding: 0.75rem; font-weight: bold;">Email:</td>
+                <td style="padding: 0.75rem;">{{ user.email or 'N/A' }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #ecf0f1;">
+                <td style="padding: 0.75rem; font-weight: bold;">Name:</td>
+                <td style="padding: 0.75rem;">{{ user.name or 'N/A' }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #ecf0f1;">
+                <td style="padding: 0.75rem; font-weight: bold;">Username:</td>
+                <td style="padding: 0.75rem;">{{ user.preferred_username or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 0.75rem; font-weight: bold;">Groups:</td>
+                <td style="padding: 0.75rem;">
+                    {% if user.groups %}
+                        {% for group in user.groups %}
+                            <span style="background: #3498db; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; margin-right: 0.5rem; display: inline-block;">{{ group }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span style="color: #7f8c8d;">No groups assigned</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Token Information -->
+    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #3498db; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0;">🔑 Authentication Details</h3>
+        <p style="margin-bottom: 0.5rem;"><strong>Token Type:</strong> JWT (JSON Web Token)</p>
+        <p style="margin-bottom: 0.5rem;"><strong>Validation:</strong> JWKS public key verification</p>
+        <p style="margin-bottom: 0.5rem;"><strong>Storage:</strong> Secure HttpOnly cookies</p>
+        <p style="margin-bottom: 0;"><strong>Auto-Refresh:</strong> Every 8 minutes (tokens expire in 10 minutes)</p>
+    </div>
+
+    <!-- Example API Calls -->
+    <div style="background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2>Test API Endpoints</h2>
+        <p style="color: #7f8c8d; margin-bottom: 1rem;">These buttons demonstrate authenticated API requests:</p>
+
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="testMeEndpoint()">
+                Test /api/me
+            </button>
+            <button class="btn btn-primary" onclick="testAuthStatus()">
+                Test /api/auth/status
+            </button>
+        </div>
+
+        <div id="apiResult" style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; display: none;">
+            <h4 style="margin-top: 0;">API Response:</h4>
+            <pre id="apiResultContent" style="background: #2c3e50; color: #ecf0f1; padding: 1rem; border-radius: 4px; overflow-x: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function testMeEndpoint() {
+        showApiResult('Loading...');
+        try {
+            const response = await fetch('/api/me', {
+                credentials: 'include',
+                headers: {
+                    'Authorization': 'Bearer ' + getCookie('access_token')
+                }
+            });
+            const data = await response.json();
+            showApiResult(JSON.stringify(data, null, 2));
+        } catch (error) {
+            showApiResult('Error: ' + error.message);
+        }
+    }
+
+    async function testAuthStatus() {
+        showApiResult('Loading...');
+        try {
+            const response = await fetch('/api/auth/status', {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            showApiResult(JSON.stringify(data, null, 2));
+        } catch (error) {
+            showApiResult('Error: ' + error.message);
+        }
+    }
+
+    function showApiResult(content) {
+        const resultDiv = document.getElementById('apiResult');
+        const resultContent = document.getElementById('apiResultContent');
+        resultContent.textContent = content;
+        resultDiv.style.display = 'block';
+    }
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+</script>
+{% endblock %}

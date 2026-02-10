@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Home{% endblock %} - Evezor</title>
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Authentication UI Styles */
+        .auth-nav {
+            background: #2c3e50;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .auth-nav .logo {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .user-info {
+            color: #ecf0f1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #3498db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar with Authentication -->
+    <nav class="auth-nav">
+        <a href="/" class="logo">Evezor Home</a>
+        <div class="auth-status" id="authStatus">
+            <!-- Will be populated by JavaScript -->
+            <div class="loading">Loading...</div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Authentication JavaScript -->
+    <script>
+        // Check authentication status on page load
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/auth/status', {
+                    credentials: 'include'  // Include cookies
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.authenticated) {
+                        showAuthenticatedUI(data.user);
+                    } else {
+                        showUnauthenticatedUI();
+                    }
+                } else {
+                    showUnauthenticatedUI();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                showUnauthenticatedUI();
+            }
+        }
+
+        function showAuthenticatedUI(user) {
+            const authStatus = document.getElementById('authStatus');
+            const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?';
+
+            authStatus.innerHTML = `
+                <div class="user-info">
+                    <div class="user-avatar">${initials}</div>
+                    <span>Welcome, ${user.name || user.email}</span>
+                </div>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            `;
+        }
+
+        function showUnauthenticatedUI() {
+            const authStatus = document.getElementById('authStatus');
+            authStatus.innerHTML = `
+                <a href="/auth/login" class="btn btn-primary">Login</a>
+            `;
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Logout failed:', error);
+                alert('Logout failed. Please try again.');
+            }
+        }
+
+        // Auto-refresh token before expiration (every 8 minutes, tokens expire in 10)
+        setInterval(async () => {
+            try {
+                await fetch('/auth/refresh', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Token refresh failed:', error);
+            }
+        }, 8 * 60 * 1000);
+
+        // Check auth status on page load
+        document.addEventListener('DOMContentLoaded', checkAuthStatus);
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
