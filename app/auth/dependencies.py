@@ -1,8 +1,8 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from jwt.exceptions import InvalidTokenError, ExpiredSignatureError, InvalidAudienceError
-from typing import List
+from typing import List, Optional
 from .jwks import get_jwks_client
 from .config import AuthentikSettings
 from .models import TokenData
@@ -39,7 +39,8 @@ async def verify_token(token: str) -> TokenData:
             signing_key.key,
             algorithms=["RS256"],  # Only allow RS256
             audience=settings.client_id,  # Validate audience claim
-            issuer=settings.domain,  # Validate issuer claim
+            issuer=settings.issuer,  # Validate issuer claim
+            leeway=10,  # Allow 10 seconds clock skew tolerance
             options={
                 "verify_signature": True,
                 "verify_exp": True,  # Check expiration
@@ -64,6 +65,7 @@ async def verify_token(token: str) -> TokenData:
             headers={"WWW-Authenticate": "Bearer"}
         )
     except InvalidTokenError as e:
+        print(f"DEBUG: Invalid token error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}",
@@ -71,9 +73,12 @@ async def verify_token(token: str) -> TokenData:
         )
     except Exception as e:
         # Catch-all for unexpected errors (JWKS fetch failures, etc.)
+        print(f"DEBUG: Token validation exception: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail=f"Could not validate credentials: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
@@ -99,6 +104,34 @@ async def get_current_user(
     """
     token = credentials.credentials
     return await verify_token(token)
+
+async def get_current_user_from_cookie(
+    access_token: Optional[str] = Cookie(None)
+) -> TokenData:
+    """
+    Dependency to get current authenticated user from cookie
+
+    Usage:
+        @app.get("/protected")
+        async def protected_route(user: TokenData = Depends(get_current_user_from_cookie)):
+            return {"user_id": user.sub, "email": user.email}
+
+    Args:
+        access_token: JWT token from cookie
+
+    Returns:
+        TokenData with user information
+
+    Raises:
+        HTTPException: If authentication fails or no token provided
+    """
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    return await verify_token(access_token)
 
 def require_group(required_groups: List[str]):
     """

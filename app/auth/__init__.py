@@ -11,7 +11,7 @@ This module provides:
 from .config import AuthentikSettings
 from .models import TokenResponse, UserInfo, TokenData
 from .oauth import AuthentikOAuth
-from .dependencies import get_current_user, require_group, verify_token
+from .dependencies import get_current_user, get_current_user_from_cookie, require_group, verify_token
 from .jwks import AuthentikJWKSClient, get_jwks_client
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "TokenData",
     "AuthentikOAuth",
     "get_current_user",
+    "get_current_user_from_cookie",
     "require_group",
     "verify_token",
     "AuthentikJWKSClient",

@@ -1,5 +1,5 @@
 
-from fastapi import Depends, FastAPI, Request, Form, status, Header, Response, Cookie, HTTPException
+from fastapi import Depends, FastAPI, Request, Form, status, Header, Cookie, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -9,8 +9,12 @@ from typing import Optional
 import os
 import secrets
 
+
+# Secure cookie can be turned off for local development (not recommended for production)
+SECURE_COOKIES = False
+
 # Import authentication modules
-from auth import AuthentikSettings, AuthentikOAuth, get_current_user, TokenData, verify_token
+from auth import AuthentikSettings, AuthentikOAuth, get_current_user_from_cookie, TokenData, verify_token
 
 app = FastAPI()
 templates = Jinja2Templates(directory='htmldirectory')
@@ -44,8 +48,7 @@ async def login():
 @app.get("/auth/callback")
 async def auth_callback(
     code: str,
-    state: str,
-    response: Response
+    state: str
 ):
     """Handle OAuth callback from Authentik"""
     # Verify state to prevent CSRF
@@ -57,15 +60,26 @@ async def auth_callback(
     # Exchange code for tokens
     token_response = await oauth_client.exchange_code_for_token(code)
 
+    # DEBUG: Log what we received from Authentik
+    print(f"DEBUG: Token response from Authentik:")
+    print(f"  - access_token: {token_response.access_token[:50]}...")
+    print(f"  - refresh_token: {token_response.refresh_token[:50] if token_response.refresh_token else 'None'}")
+    print(f"  - token_type: {token_response.token_type}")
+    print(f"  - expires_in: {token_response.expires_in}")
+    print(f"  - scope: {token_response.scope}")
+
     # Get user info
     user_info = await oauth_client.get_userinfo(token_response.access_token)
+
+    # Create redirect response
+    response = RedirectResponse(url="/", status_code=303)
 
     # Set tokens in httponly cookies (secure in production)
     response.set_cookie(
         key="access_token",
         value=token_response.access_token,
         httponly=True,
-        secure=True,  # HTTPS only
+        secure=SECURE_COOKIES,  # HTTPS only
         samesite="lax",
         max_age=600  # 10 minutes
     )
@@ -75,19 +89,18 @@ async def auth_callback(
             key="refresh_token",
             value=token_response.refresh_token,
             httponly=True,
-            secure=True,
+            secure=SECURE_COOKIES,
             samesite="lax",
             max_age=86400  # 24 hours
         )
 
-    # Redirect to home page
-    return RedirectResponse(url="/", status_code=303)
+    # Return the redirect response with cookies
+    return response
 
 
 @app.post("/auth/refresh")
 async def refresh_token(
-    refresh_token: Optional[str] = Cookie(None),
-    response: Response = None
+    refresh_token: Optional[str] = Cookie(None)
 ):
     """Refresh access token using refresh token"""
     if not refresh_token:
@@ -95,25 +108,31 @@ async def refresh_token(
 
     token_response = await oauth_client.refresh_access_token(refresh_token)
 
+    # Create JSON response with cookie
+    response = JSONResponse(content={"message": "Token refreshed successfully"})
+
     response.set_cookie(
         key="access_token",
         value=token_response.access_token,
         httponly=True,
-        secure=True,
+        secure=SECURE_COOKIES,
         samesite="lax",
         max_age=600
     )
 
-    return {"message": "Token refreshed successfully"}
+    return response
 
 
 @app.post("/auth/logout")
-async def logout(response: Response):
+async def logout():
     """Logout user by clearing cookies"""
+    # Create JSON response with deleted cookies
+    response = JSONResponse(content={"message": "Logged out successfully"})
+
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
 
-    return {"message": "Logged out successfully"}
+    return response
 
 
 # ===== API Routes =====
@@ -151,7 +170,7 @@ async def auth_status(access_token: Optional[str] = Cookie(None)):
 
 
 @app.get("/api/me")
-async def get_me(user: TokenData = Depends(get_current_user)):
+async def get_me(user: TokenData = Depends(get_current_user_from_cookie)):
     """
     Example protected endpoint - requires authentication
     Returns current user information

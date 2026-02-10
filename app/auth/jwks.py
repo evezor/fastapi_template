@@ -19,8 +19,7 @@ class AuthentikJWKSClient:
             uri=jwks_uri,
             cache_keys=True,
             max_cached_keys=16,
-            cache_jwk_set_ttl=cache_ttl,
-            lifespan=cache_ttl
+            lifespan=cache_ttl  # TTL for cached JWKS in seconds
         )
 
     def get_signing_key_from_jwt(self, token: str):

@@ -7,6 +7,7 @@ class AuthentikSettings(BaseSettings):
     client_id: str
     client_secret: str
     redirect_uri: str
+    app_slug: str = "evezor"  # Application/Provider slug in Authentik
 
     @property
     def authorization_endpoint(self) -> str:
@@ -26,7 +27,12 @@ class AuthentikSettings(BaseSettings):
     @property
     def jwks_uri(self) -> str:
         """JWKS endpoint for public key verification"""
-        return f"{self.domain}/application/o/{self.client_id}/jwks/"
+        return f"{self.domain}/application/o/{self.app_slug}/jwks/"
+
+    @property
+    def issuer(self) -> str:
+        """OAuth2 issuer claim (for JWT validation)"""
+        return f"{self.domain}/application/o/{self.app_slug}/"
 
     class Config:
         env_prefix = "AUTHENTIK_"

@@ -29,7 +29,7 @@ class AuthentikOAuth:
             "client_id": self.settings.client_id,
             "response_type": "code",
             "redirect_uri": self.settings.redirect_uri,
-            "scope": "openid profile email groups",
+            "scope": "openid profile email groups offline_access",
             "state": state,
         }
         query = "&".join([f"{k}={v}" for k, v in params.items()])
