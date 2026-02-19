@@ -16,3 +16,18 @@ services:
       volumes:
         - ./app:/app
 
+  test:
+      build:
+        context: ./app
+        dockerfile: Dockerfile
+      command: pytest tests/ -v
+      environment:
+        PYTHONUNBUFFERED: 1
+        PYTHONDONTWRITEBYTECODE: 1
+      env_file:
+        - .env
+      volumes:
+        - ./app:/app
+      profiles:
+        - test  # Only run when explicitly requested
+
