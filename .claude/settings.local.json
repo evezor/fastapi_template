@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(curl:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose run:*)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npx shadcn@latest add button resizable separator tooltip scroll-area -y)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm ls:*)",
+      "Bash(node:*)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(npx shadcn@latest add input select label -y)",
+      "Bash(npx eslint:*)",
+      "Bash(npx shadcn@latest add dialog:*)"
+    ]
+  }
+}

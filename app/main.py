@@ -1,55 +1,120 @@
+import json
+import uuid
+from pathlib import Path
+from typing import Literal, Union
 
-from fastapi import Depends, FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from starlette.responses import RedirectResponse
+import aiofiles
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import os
 
-ENV_1 = os.getenv("ENV_1")
-ENV_2 = os.getenv("ENV_2")
+# ---------------------------------------------------------------------------
+# Pydantic models (mirror frontend TypeScript types)
+# ---------------------------------------------------------------------------
 
-class FormModel(BaseModel):
-    form1: str
-    form2: str
-    form3: str
-    form4: str
+class KeyframeModel(BaseModel):
+    time: float
+    value: Union[float, bool, str]
+    interpolation: Literal["linear", "step"]
+
+class ChannelConfigModel(BaseModel):
+    min: float | None = None
+    max: float | None = None
+
+class ChannelModel(BaseModel):
+    id: str
+    name: str
+    type: Literal["bool", "float", "int", "color"]
+    config: ChannelConfigModel
+    keyframes: list[KeyframeModel]
+
+class ProjectMetaModel(BaseModel):
+    name: str
+    duration: float
+    timeMode: Literal["seconds", "frames", "bpm"]
+    fps: int
+
+class TimelineProjectModel(BaseModel):
+    project: ProjectMetaModel
+    channels: list[ChannelModel]
+
+class SavedProject(TimelineProjectModel):
+    id: str
+
+class ProjectSummary(BaseModel):
+    id: str
+    name: str
+
+# ---------------------------------------------------------------------------
+# Storage
+# ---------------------------------------------------------------------------
+
+PROJECTS_DIR = Path(__file__).parent / "projects"
 
 app = FastAPI()
-templates = Jinja2Templates(directory='htmldirectory')
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+
+@app.on_event("startup")
+async def startup():
+    PROJECTS_DIR.mkdir(exist_ok=True)
+
+def _project_path(project_id: str) -> Path:
+    # Prevent path traversal
+    if "/" in project_id or "\\" in project_id or ".." in project_id:
+        raise HTTPException(status_code=400, detail="Invalid project ID")
+    return PROJECTS_DIR / f"{project_id}.json"
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/projects", response_model=list[ProjectSummary])
+async def list_projects():
+    summaries: list[ProjectSummary] = []
+    for path in sorted(PROJECTS_DIR.glob("*.json")):
+        try:
+            async with aiofiles.open(path, "r") as f:
+                data = json.loads(await f.read())
+            summaries.append(ProjectSummary(id=data["id"], name=data["project"]["name"]))
+        except (json.JSONDecodeError, KeyError):
+            continue
+    return summaries
 
 
-@app.get('/', response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse('index.html', {'request': request, 'env_1': ENV_1, 'env_2': ENV_2})
+@app.post("/api/projects", response_model=SavedProject, status_code=201)
+async def create_project(body: TimelineProjectModel):
+    project_id = str(uuid.uuid4())
+    saved = SavedProject(id=project_id, **body.model_dump())
+    path = _project_path(project_id)
+    async with aiofiles.open(path, "w") as f:
+        await f.write(saved.model_dump_json(indent=2))
+    return saved
 
 
-@app.get('/redirect', response_class=HTMLResponse)
-async def redir(request: Request):
-    response = RedirectResponse(url='/')
-    return response
+@app.get("/api/projects/{project_id}", response_model=SavedProject)
+async def get_project(project_id: str):
+    path = _project_path(project_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    async with aiofiles.open(path, "r") as f:
+        data = json.loads(await f.read())
+    return SavedProject(**data)
 
-@app.get('/arg/{arg}', response_class=JSONResponse)
-async def arg(arg: str):
-    return {"the_arg_is": arg}
 
-@app.post('/query_form', response_class=JSONResponse)
-async def q_form(request: Request, form1: str=Form(...), form2: str=Form(...)):
-    return {"form1": form1, "form2": form2}
+@app.put("/api/projects/{project_id}", response_model=SavedProject)
+async def update_project(project_id: str, body: TimelineProjectModel):
+    path = _project_path(project_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    saved = SavedProject(id=project_id, **body.model_dump())
+    async with aiofiles.open(path, "w") as f:
+        await f.write(saved.model_dump_json(indent=2))
+    return saved
 
-@app.post('/query_raw', response_class=JSONResponse)
-async def q_raw(request: Request):
-    raw_form = dict(await request.form())
-    
-    return {"raw_form": raw_form}
 
-@app.get('/query_get', response_class=JSONResponse)
-async def q_get(request: Request, form1: str, form2:str):
-    return {"form1": form1, 'form2': form2}
-
-@app.post('/form_model', response_class=JSONResponse)
-async def f_model(request: Request, form_model: FormModel):
-    print(form_model)
-    return {"form_model": form_model}
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: str):
+    path = _project_path(project_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    path.unlink()
+    return JSONResponse(status_code=200, content={"detail": "Deleted"})
