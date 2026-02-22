@@ -23,10 +23,19 @@ export function ColorGradient({
 
   const gradientId = `color-grad-${channelId}`
 
-  const stops = keyframes.map((kf) => ({
-    offset: ((timeToX(kf.time, pixelsPerSecond) - firstX) / width) * 100,
-    color: String(kf.value),
-  }))
+  const stops: { offset: number; color: string }[] = []
+  for (let i = 0; i < keyframes.length; i++) {
+    const kf = keyframes[i]
+    const offset = ((timeToX(kf.time, pixelsPerSecond) - firstX) / width) * 100
+    stops.push({ offset, color: String(kf.value) })
+
+    // For step interpolation, hold this color flat until just before the next keyframe
+    if (kf.interpolation === "step" && i < keyframes.length - 1) {
+      const nextOffset =
+        ((timeToX(keyframes[i + 1].time, pixelsPerSecond) - firstX) / width) * 100
+      stops.push({ offset: nextOffset, color: String(kf.value) })
+    }
+  }
 
   const padding = trackHeight * 0.25
 

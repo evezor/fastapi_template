@@ -13,6 +13,7 @@ import {
 import { useTimelineStore } from "@/store/timeline-store"
 import { formatTime, evaluateChannelAtTime } from "@/lib/timeline-utils"
 import { Trash2 } from "lucide-react"
+import { ColorPicker } from "./ColorPicker"
 
 export function PropertiesPanel() {
   const channels = useTimelineStore((s) => s.channels)
@@ -31,8 +32,9 @@ export function PropertiesPanel() {
       : null
 
   // Use a key that resets local input state when the selected keyframe changes
+  // Note: value is excluded so that editing (e.g. dragging a color slider) doesn't remount the tree
   const editorKey = keyframe
-    ? `${selectedChannelId}-${selectedKeyframeIndex}-${keyframe.time}-${keyframe.value}`
+    ? `${selectedChannelId}-${selectedKeyframeIndex}`
     : ""
 
   return (
@@ -237,29 +239,7 @@ function ValueInput({
   }
 
   if (channelType === "color") {
-    return (
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Color</Label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="color"
-            value={String(value)}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-8 h-7 rounded border border-border cursor-pointer bg-transparent"
-          />
-          <Input
-            value={String(value)}
-            onChange={(e) => {
-              if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
-                onChange(e.target.value)
-              }
-            }}
-            className="h-7 text-xs font-mono flex-1"
-            placeholder="#ff0000"
-          />
-        </div>
-      </div>
-    )
+    return <ColorPicker value={String(value)} onChange={onChange} />
   }
 
   // Float or Int

@@ -112,6 +112,39 @@ export function KeyframeMarker({
         ? "var(--primary)"
         : "var(--muted-foreground)"
 
+  const stroke = isSelected ? "var(--primary-foreground)" : "none"
+  const strokeWidth = isSelected ? 1.5 : 0
+
+  let shape: React.ReactNode
+  switch (keyframe.interpolation) {
+    case "step":
+      // Square — hard/blocky feel for hard transitions
+      shape = (
+        <rect
+          x={x - size}
+          y={cy - size}
+          width={size * 2}
+          height={size * 2}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+        />
+      )
+      break
+    case "linear":
+    default:
+      // Diamond — standard interpolation
+      shape = (
+        <polygon
+          points={`${x},${cy - size} ${x + size},${cy} ${x},${cy + size} ${x - size},${cy}`}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+        />
+      )
+      break
+  }
+
   return (
     <g onPointerDown={handlePointerDown} style={{ cursor: "grab" }}>
       {/* Hit area */}
@@ -122,13 +155,7 @@ export function KeyframeMarker({
         height={size * 4}
         fill="transparent"
       />
-      {/* Diamond */}
-      <polygon
-        points={`${x},${cy - size} ${x + size},${cy} ${x},${cy + size} ${x - size},${cy}`}
-        fill={fill}
-        stroke={isSelected ? "var(--primary-foreground)" : "none"}
-        strokeWidth={isSelected ? 1.5 : 0}
-      />
+      {shape}
     </g>
   )
 }

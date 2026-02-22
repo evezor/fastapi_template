@@ -1,0 +1,10 @@
+{
+  "project": {
+    "name": "another new",
+    "duration": 30.0,
+    "timeMode": "seconds",
+    "fps": 30
+  },
+  "channels": [],
+  "id": "43fe9a67-d1c9-4a9a-88bf-b6516a5e7933"
+}
